@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="icon" href="tabicon.png" type="image/png">
+
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Protein Viewer</title>
+  <style>
+    body {
+      font-family:  Georgia, serif;
+      background-color: black;
+      color: white;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* Hide scrollbar but allow scroll */
+    #sidebar,
+    #container {
+      overflow-y: scroll;
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    #sidebar::-webkit-scrollbar,
+    #container::-webkit-scrollbar {
+      display: none;
+    }
+
+    #sidebar {
+      width: 200px;
+      background-color: #222;
+      padding: 20px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      align-items: flex-start;
+      height: 100vh;
+    }
+
+    #sidebar h2 {
+      color: white;
+      margin-bottom: 20px;
+    }
+
+    #sidebar ul {
+      list-style-type: none;
+      padding: 0;
+    }
+
+    #sidebar li {
+      margin: 10px 0;
+      cursor: pointer;
+      font-size: 18px;
+      color: #ddd;
+    }
+
+    #sidebar li:hover {
+      color: white;
+    }
+
+    #container {
+      flex: 1;
+      padding: 20px;
+      max-width: 1000px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    h1 {
+      font-size: 3em;
+      margin-bottom: 20px;
+      color: white;
+      text-align: center;
+    }
+
+    p {
+      text-align: center;
+    }
+
+    input,
+    button {
+      padding: 10px;
+      margin: 10px;
+      font-size: 18px;
+      font-family:  Georgia, serif;
+      border: none;
+      border-radius: 5px;
+    }
+
+    input {
+      width: 300px;
+    }
+
+    button {
+      background-color: white;
+      color: black;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #ccc;
+    }
+
+    #protein-info {
+      margin-top: 20px;
+      font-size: 1.2em;
+      display: inline-block;
+      text-align: left;
+      padding: 15px;
+      background-color: #333;
+      border-radius: 10px;
+      width: 100%;
+      box-sizing: border-box;
+      margin-bottom: 30px;
+    }
+
+    #protein-info h2 {
+      background-color: #444;
+      padding: 10px;
+      border-radius: 5px;
+      display: inline-block;
+      font-size: 1.5em;
+      margin-bottom: 20px;
+    }
+
+    #protein-info p {
+      padding: 10px;
+      background-color: #444;
+      border-radius: 5px;
+      margin: 10px 0;
+    }
+
+    #viewer {
+      width: 800px;
+      height: 600px;
+      margin: 20px auto;
+      background-color: black;
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    #copyright {
+      font-size: 0.8em;
+      color: #888;
+      margin-top: 40px;
+      text-align: center;
+    }
+
+    a {
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <div id="sidebar">
+    <h2>General Proteins</h2>
+    <ul>
+      <li onclick="fetchProtein('1CRN')">Protein 1CRN</li>
+      <li onclick="fetchProtein('1A3N')">Protein 1A3N</li>
+      <li onclick="fetchProtein('2HHB')">Protein 2HHB</li>
+      <li onclick="fetchProtein('1FJB')">Protein 1FJB</li>
+      <li onclick="fetchProtein('2MEC')">Protein 2MEC</li>
+    </ul>
+  </div>
+
+  <div id="container">
+    <h1>3D Protein Viewer</h1>
+    <p>Enter a Protein ID (e.g., 1CRN) to fetch and visualize its structure.</p>
+    <div>
+      <input type="text" id="protein-id" placeholder="Enter Protein ID" />
+      <button onclick="fetchProtein()">Search</button>
+    </div>
+    <div id="protein-info"></div>
+    <div id="viewer"></div>
+    <div id="copyright">
+      <p>Data sourced from <a href="https://www.rcsb.org" target="_blank">RCSB PDB</a></p>
+    </div>
+  </div>
+
+  <script src="https://3dmol.csb.pitt.edu/build/3Dmol-min.js"></script>
+  <script>
+    async function fetchProtein(proteinId) {
+      const infoDiv = document.getElementById('protein-info');
+      const viewerDiv = document.getElementById('viewer');
+
+      infoDiv.innerHTML = '';
+      viewerDiv.innerHTML = '';
+
+      if (!proteinId) {
+        proteinId = document.getElementById('protein-id').value.trim();
+      }
+
+      if (!proteinId) {
+        infoDiv.innerHTML =
+          '<p style="color: red;">Please enter a valid Protein ID or click on a protein name.</p>';
+        return;
+      }
+
+      try {
+        const metadataResponse = await fetch(
+          `https://data.rcsb.org/rest/v1/core/entry/${proteinId}`
+        );
+        if (!metadataResponse.ok) {
+          throw new Error('Failed to fetch metadata.');
+        }
+        const metadata = await metadataResponse.json();
+
+        const title = metadata.struct?.title || 'N/A';
+        const keywords = metadata.struct_keywords?.pdbx_keywords || 'N/A';
+        const chains =
+          metadata.rcsb_entry_container_identifiers?.polymer_entity_ids?.join(', ') || 'N/A';
+        const depositDate = metadata.rcsb_accession_info?.deposit_date || 'N/A';
+        const releaseDate = metadata.rcsb_accession_info?.initial_release_date || 'N/A';
+
+        infoDiv.innerHTML = `
+          <h2>${metadata.rcsb_id}</h2>
+          <p><strong>Title:</strong> ${title}</p>
+          <p><strong>Keywords:</strong> ${keywords}</p>
+          <p><strong>Chains:</strong> ${chains}</p>
+          <p><strong>Deposited:</strong> ${new Date(depositDate).toLocaleDateString()}</p>
+          <p><strong>Released:</strong> ${new Date(releaseDate).toLocaleDateString()}</p>
+        `;
+
+        const pdbResponse = await fetch(`https://files.rcsb.org/download/${proteinId}.pdb`);
+        if (!pdbResponse.ok) {
+          throw new Error('Failed to fetch PDB file.');
+        }
+        const pdbData = await pdbResponse.text();
+
+        const viewer = $3Dmol.createViewer(viewerDiv, { backgroundColor: 'black' });
+        viewer.addModel(pdbData, 'pdb');
+        viewer.setStyle({}, { cartoon: { color: 'white' } }); // model style changed to white
+        viewer.zoomTo();
+        viewer.render();
+        viewer.resize();
+      } catch (error) {
+        infoDiv.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+      }
+    }
+  </script>
+</body>
+</html>
